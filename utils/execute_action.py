@@ -62,7 +62,8 @@ def validate_action(action: Dict[str, Any]) -> tuple[bool, str]:
         return False, "Missing 'action' field"
 
     action_type = action["action"]
-    valid_actions = ["tap", "type", "home", "back", "wait", "done", "start_intent", "swipe", "open_app", "screenshot", "long_press", "drag_and_drop", "get_current_package"]
+    valid_actions = ["tap", "type", "home", "back", "wait", "done", "start_intent", "swipe", "open_app", "screenshot",
+                     "long_press", "drag_and_drop", "get_current_package"]
 
     if action_type not in valid_actions:
         return False, f"Invalid action type '{action_type}'. Must be one of: {valid_actions}"
@@ -82,7 +83,7 @@ def validate_action(action: Dict[str, Any]) -> tuple[bool, str]:
             return False, "type action requires 'text' field"
         if not isinstance(action["text"], str):
             return False, "text must be a string"
-    
+
     elif action_type == "start_intent":
         if "uri" not in action:
             return False, "start_intent action requires 'uri' field"
@@ -92,7 +93,7 @@ def validate_action(action: Dict[str, Any]) -> tuple[bool, str]:
             return False, "package must be a string"
         if not isinstance(action["package"], str):
             return False, "package must be a string"
-    
+
     elif action_type == "swipe":
         if "start_coordinates" not in action:
             return False, "swipe action requires 'start_coordinates' field"
@@ -109,13 +110,13 @@ def validate_action(action: Dict[str, Any]) -> tuple[bool, str]:
             return False, "end_coordinates must be [x, y] array"
         if not all(isinstance(c, (int, float)) for c in end_coords):
             return False, "coordinates must be numeric"
-        
+
         if "duration" in action:
             if not isinstance(action["duration"], (int, float)):
                 return False, "duration must be a number"
             if action["duration"] < 0:
                 return False, "duration cannot be negative"
-    
+
     elif action_type == "open_app":
         if "package_name" not in action:
             return False, "open_app action requires 'package_name' field"
@@ -204,11 +205,7 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
 
         elif action_type == "type":
             text = action["text"]
-            # Enclose the text in single quotes for adb shell to handle spaces and special characters correctly
-            # The 'adb shell input text' command generally handles spaces correctly when the entire string is quoted.
-            # Using '%s' for spaces is typically for direct adb commands without Python's quoting.
-            # However, the primary limitation observed is with Unicode characters, not spaces.
-            quoted_text = f"'{text}'" 
+            quoted_text = f"'{text}'"
 
             stdout, stderr, code = adb_helper.run_adb([
                 "shell", "input", "text", quoted_text
@@ -230,7 +227,7 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
 
         elif action_type == "home":
             stdout, stderr, code = adb_helper.run_adb([
-                "shell", "input", "keyevent", "KEYCODE_HOME"  # FIX: was KEYWORDS_HOME
+                "shell", "input", "keyevent", "KEYCODE_HOME"
             ])
 
             if code != 0:
@@ -249,7 +246,7 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
 
         elif action_type == "back":
             stdout, stderr, code = adb_helper.run_adb([
-                "shell", "input", "keyevent", "KEYCODE_BACK"  # FIX: was KEYWORDS_BACK
+                "shell", "input", "keyevent", "KEYCODE_BACK"
             ])
 
             if code != 0:
@@ -286,7 +283,7 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
         elif action_type == "start_intent":
             uri = action["uri"]
             package = action["package"]
-            
+
             stdout, stderr, code = adb_helper.run_adb([
                 "shell", "am", "start", "-a", "android.intent.action.VIEW",
                 "-d", uri, package
@@ -305,7 +302,7 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
                 "action": "start_intent",
                 "message": f"Started intent with URI: {uri} and package: {package}"
             }
-        
+
         elif action_type == "swipe":
             start_x, start_y = action["start_coordinates"]
             end_x, end_y = action["end_coordinates"]
@@ -336,7 +333,8 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
             return {
                 "status": "success",
                 "action": "swipe",
-                "message": f"Swiped from [{start_x},{start_y}] to [{end_x},{end_y}]" + (f" over {duration}ms" if duration else "")
+                "message": f"Swiped from [{start_x},{start_y}] to [{end_x},{end_y}]" + (
+                    f" over {duration}ms" if duration else "")
             }
 
         elif action_type == "open_app":
@@ -363,7 +361,7 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
 
         elif action_type == "screenshot":
             local_file_path = action.get("file_path")
-            
+
             # Generate a temporary file name on the device
             device_screenshot_path = f"/sdcard/screenshot_{int(time.time())}.png"
 
@@ -377,9 +375,9 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
                     "status": "error",
                     "message": f"Screenshot failed on device: {stderr}"
                 }
-            
+
             message = f"Screenshot saved on device: {device_screenshot_path}"
-            
+
             # If local_file_path is provided, pull the screenshot to local machine
             if local_file_path:
                 stdout, stderr, code = adb_helper.run_adb([
@@ -387,14 +385,13 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
                 ])
                 if code != 0:
                     log_action("screenshot", local_file_path, f"ERROR: {stderr}")
-                    # Still return success for device capture if pull failed
                     return {
                         "status": "warning",
                         "message": f"Screenshot saved on device but failed to pull to local: {stderr}"
                     }
                 message = f"Screenshot saved to local: {local_file_path} (also on device: {device_screenshot_path})"
-            
-            # Clean up screenshot on device (optional, but good practice)
+
+            # Clean up screenshot on device
             adb_helper.run_adb(["shell", "rm", device_screenshot_path])
 
             log_action("screenshot", local_file_path or device_screenshot_path, "SUCCESS")
@@ -406,7 +403,7 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
 
         elif action_type == "long_press":
             x, y = action["coordinates"]
-            duration = action.get("duration", 1000) # Default 1s
+            duration = action.get("duration", 1000)  # Default 1s
 
             stdout, stderr, code = adb_helper.run_adb([
                 "shell", "input", "swipe", str(x), str(y), str(x), str(y), str(int(duration))
@@ -417,7 +414,8 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
                 return {"status": "error", "message": f"Long press failed: {stderr}"}
 
             log_action("long_press", f"{x},{y}, duration={duration}", "SUCCESS")
-            return {"status": "success", "action": "long_press", "message": f"Long pressed at ({x}, {y}) for {duration}ms"}
+            return {"status": "success", "action": "long_press",
+                    "message": f"Long pressed at ({x}, {y}) for {duration}ms"}
 
         elif action_type == "drag_and_drop":
             sx, sy = action["start_coordinates"]
@@ -425,3 +423,57 @@ def execute_action(action: Dict[str, Any]) -> Dict[str, Any]:
             duration = action.get("duration", 1000)
 
             stdout, stderr, code = adb_helper.run_adb([
+                "shell", "input", "swipe",
+                str(int(sx)), str(int(sy)),
+                str(int(ex)), str(int(ey)),
+                str(int(duration))
+            ])
+
+            if code != 0:
+                log_action("drag_and_drop", f"start=[{sx},{sy}], end=[{ex},{ey}]", f"ERROR: {stderr}")
+                return {
+                    "status": "error",
+                    "message": f"Drag and drop failed: {stderr}"
+                }
+
+            log_action("drag_and_drop", f"start=[{sx},{sy}], end=[{ex},{ey}]", "SUCCESS")
+            return {
+                "status": "success",
+                "action": "drag_and_drop",
+                "message": f"Dragged from [{sx},{sy}] to [{ex},{ey}] over {duration}ms"
+            }
+
+        return {"status": "error", "message": f"Unknown action type: {action_type}"}
+
+    except Exception as e:
+        log_action(action_type, str(action), f"EXCEPTION: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Execution exception: {str(e)}"
+        }
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Execute action on Android device")
+    parser.add_argument("--json", type=str, help="JSON string of action")
+    args = parser.parse_args()
+
+    try:
+        if args.json:
+            action_data = json.loads(args.json)
+        else:
+            # Read from stdin
+            input_data = sys.stdin.read()
+            if not input_data.strip():
+                # No input, just print usage
+                parser.print_help()
+                sys.exit(1)
+            action_data = json.loads(input_data)
+
+        result = execute_action(action_data)
+        print(json.dumps(result))
+
+    except json.JSONDecodeError:
+        print(json.dumps({"status": "error", "message": "Invalid JSON input"}))
+    except Exception as e:
+        print(json.dumps({"status": "error", "message": f"Unexpected error: {str(e)}"}))
